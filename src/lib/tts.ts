@@ -4,9 +4,26 @@
  * @param text The text to be synthesized into speech
  * @param description Originally used for Maya, kept for component compatibility
  */
+
+let currentAudioContext: { stopRequested: boolean, audioElement: HTMLAudioElement | null } | null = null;
+
+export async function stopSpeech() {
+    if (currentAudioContext) {
+        currentAudioContext.stopRequested = true;
+        if (currentAudioContext.audioElement) {
+            currentAudioContext.audioElement.pause();
+            currentAudioContext.audioElement.currentTime = 0;
+        }
+    }
+}
+
 export async function generateSpeech(text: string, description?: string): Promise<void> {
     try {
-        // Calling our internal Next.js route instead of the python server
+        await stopSpeech();
+
+        const myContext = { stopRequested: false, audioElement: null as HTMLAudioElement | null };
+        currentAudioContext = myContext;
+
         const response = await fetch('/api/tts', {
             method: 'POST',
             headers: {
@@ -17,25 +34,45 @@ export async function generateSpeech(text: string, description?: string): Promis
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.error || `Failed to generate speech: ${response.statusText}`);
+            throw new Error(errorData.error || `Failed to generate speech`);
         }
 
-        // Convert the returned audio buffer to a binary blob
-        const audioBlob = await response.blob();
+        const data = await response.json();
 
-        // Create an object URL for the blob to be playable
-        const audioUrl = URL.createObjectURL(audioBlob);
+        if (!data.audios) return;
 
-        // Initialize the browser's Audio object
-        const audio = new Audio(audioUrl);
+        for (const base64Audio of data.audios) {
+            if (myContext.stopRequested) break;
 
-        // Play the generated audio
-        await audio.play();
+            const byteCharacters = atob(base64Audio);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const audioBlob = new Blob([byteArray], { type: 'audio/wav' });
 
-        // Clean up the URL object once audio has finished playing to free up memory
-        audio.onended = () => {
-            URL.revokeObjectURL(audioUrl);
-        };
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            myContext.audioElement = audio;
+
+            await new Promise((resolve) => {
+                audio.onended = () => {
+                    URL.revokeObjectURL(audioUrl);
+                    resolve(null);
+                };
+                audio.onerror = () => {
+                    URL.revokeObjectURL(audioUrl);
+                    resolve(null);
+                };
+                audio.play().catch((e) => {
+                    console.error("Playback interrupted:", e);
+                    resolve(null);
+                });
+            });
+
+            myContext.audioElement = null;
+        }
     } catch (error) {
         console.error('Error in generateSpeech:', error);
     }
