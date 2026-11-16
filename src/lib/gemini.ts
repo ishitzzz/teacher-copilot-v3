@@ -37,10 +37,10 @@ function buildSlots(): ModelSlot[] {
     API_KEYS.forEach((key, i) => {
         slots.push({
             client: new GoogleGenerativeAI(key),
-            modelName: "gemini-2.5-flash",
+            modelName: "gemini-3.5-flash",
             keyIndex: i,
             cooldownUntil: 0,
-            label: `Key${i + 1}/gemini-2.5-flash`,
+            label: `Key${i + 1}/gemini-3.5-flash`,
         });
     });
 
@@ -48,10 +48,10 @@ function buildSlots(): ModelSlot[] {
     API_KEYS.forEach((key, i) => {
         slots.push({
             client: new GoogleGenerativeAI(key),
-            modelName: "gemini-2.5-flash-lite",
+            modelName: "gemini-3.5-flash-lite",
             keyIndex: i,
             cooldownUntil: 0,
-            label: `Key${i + 1}/gemini-2.5-flash-lite`,
+            label: `Key${i + 1}/gemini-3.5-flash-lite`,
         });
     });
 
